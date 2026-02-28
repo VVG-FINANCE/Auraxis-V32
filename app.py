@@ -3,134 +3,144 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import pytz
+from sklearn.ensemble import RandomForestClassifier
+from scipy.stats import norm
 
-# --- 1. CONFIGURAÇÃO DE NÍVEL HEDGE FUND ---
-st.set_page_config(page_title="AURAXIS OS - FINAL CORE", layout="wide", page_icon="🛰️")
+# --- 1. SETUP DE INFRAESTRUTURA E ESTILIZAÇÃO ---
+st.set_page_config(page_title="AURAXIS V65 - SINGULARITY", layout="wide", page_icon="🧠")
 
-# Estilização CSS para Interface Dark de Alta Performance
 st.markdown("""
     <style>
     .stApp { background-color: #01040a; color: #c9d1d9; font-family: 'Inter', sans-serif; }
-    .universe-box { padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 15px; }
-    .u1-active { border-left: 10px solid #238636; background: rgba(35, 134, 54, 0.05); box-shadow: 0 0 20px rgba(35,134,54,0.1); }
-    .u2-active { border-left: 10px solid #1f6feb; background: rgba(31, 111, 235, 0.05); box-shadow: 0 0 20px rgba(31,111,235,0.1); }
-    .surf-mode { background: linear-gradient(90deg, #0d1117, #1e1b4b); border: 2px solid #f1e05a; text-align: center; padding: 15px; border-radius: 10px; color: #f1e05a; font-weight: bold; margin-bottom: 20px; }
-    .price-hero { font-family: 'JetBrains Mono', monospace; font-size: 5.5rem; font-weight: 800; text-align: center; color: #ffffff; margin-bottom: -10px; }
-    .metric-card { background: #0d1117; border: 1px solid #30363d; padding: 15px; border-radius: 10px; text-align: center; }
-    .waiting-box { border: 1px dashed #484f58; opacity: 0.4; text-align: center; padding: 40px; border-radius: 10px; }
-    .label-desc { color: #8b949e; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .price-hero { font-family: 'JetBrains Mono', monospace; font-size: 5rem; font-weight: 800; text-align: center; color: #ffffff; margin-bottom: -10px; }
+    .universe-box { padding: 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 15px; background: rgba(13, 17, 23, 0.8); }
+    .u1-active { border-left: 8px solid #238636; box-shadow: 0 0 20px rgba(35,134,54,0.1); }
+    .u2-active { border-left: 8px solid #1f6feb; box-shadow: 0 0 20px rgba(31,111,235,0.1); }
+    .surf-mode { background: linear-gradient(90deg, #0d1117, #1e1b4b); border: 2px solid #f1e05a; text-align: center; padding: 12px; border-radius: 10px; color: #f1e05a; font-weight: bold; margin-bottom: 20px; animation: glow 2s infinite; }
+    @keyframes glow { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
+    .metric-card { background: #0d1117; border: 1px solid #30363d; padding: 10px; border-radius: 8px; text-align: center; }
+    .waiting { border: 1px dashed #484f58; opacity: 0.4; text-align: center; padding: 30px; border-radius: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. MOTOR DE INTELIGÊNCIA INTEGRADO (V30-V55) ---
-def auraxis_engine(df):
-    p = df['Close'].iloc[-1]
-    # Cálculo de Volatilidade (ATR)
-    high_low = df['High'] - df['Low']
-    atr = high_low.rolling(14).mean().iloc[-1]
-    v_rel = df['Volume'].iloc[-1] / (df['Volume'].rolling(20).mean().iloc[-1] + 1e-9)
-    
-    # Memória Geracional (Z-Score)
-    rolling_mean = df['Close'].rolling(window=100).mean().iloc[-1]
-    rolling_std = df['Close'].rolling(window=100).std().iloc[-1]
-    z_score = (p - rolling_mean) / (rolling_std + 1e-9)
-    
-    # Compressão de Mola
-    comp = np.clip((df['Close'].tail(20).std() / (df['Close'].tail(100).std() + 1e-9)) * 100, 0, 100)
-    
-    # IA Confluence (Score de Decisão)
-    ia_score = np.random.uniform(20, 99)
-    
-    # Lógica de Sucessão e Stacking
-    u1_gate = ia_score > 82 and v_rel < 1.7
-    u2_gate = v_rel >= 1.7 or (ia_score > 68 and p > (df['Open'].iloc[-1] + atr*0.3))
-    
-    is_surfing = u1_gate and u2_gate
-    
-    return {
-        "p": p, "atr": atr, "v": v_rel, "z": z_score, "c": comp, "ia": ia_score,
-        "u1_active": u1_gate, "u2_active": u2_gate, "surf": is_surfing
-    }
+# --- 2. MOTOR PROBABILÍSTICO (MONTE CARLO & BAYES) ---
+@st.cache_data(ttl=60)
+def fetch_and_refine_data(ticker):
+    df = yf.download(ticker, period="2d", interval="1m", progress=False)
+    # Fragmentação simbólica (Amostragem de Qualidade)
+    df['Returns'] = df['Close'].pct_change()
+    return df.dropna()
 
-# --- 3. EXECUÇÃO DO TERMINAL ---
+def run_monte_carlo(current_price, volatility, iterations=1000, steps=60):
+    # Simula 1000 caminhos para os próximos 60 minutos
+    returns = np.random.normal(0, volatility, (iterations, steps))
+    price_paths = current_price * (1 + returns).cumprod(axis=1)
+    return price_paths
+
+def bayesian_update(prior_prob, flow_strength):
+    # Ajusta a probabilidade baseada no fluxo institucional (evidência)
+    evidence = np.clip(flow_strength / 2, 0.1, 0.9)
+    posterior = (evidence * prior_prob) / ((evidence * prior_prob) + ((1 - evidence) * (1 - prior_prob)))
+    return posterior
+
+# --- 3. MOTOR DE INTELIGÊNCIA ARTIFICIAL ---
+def run_ia_model(df):
+    # Features básicas para o Classificador Random Forest
+    df['SMA_10'] = df['Close'].rolling(10).mean()
+    df['Z_Score'] = (df['Close'] - df['SMA_10']) / df['Close'].rolling(10).std()
+    
+    # Simulação de treinamento rápido (Amostragem de Qualidade)
+    X = df[['Z_Score']].fillna(0).tail(100)
+    y = np.where(df['Returns'].shift(-1) > 0, 1, 0)[-100:]
+    
+    model = RandomForestClassifier(n_estimators=50)
+    model.fit(X, y)
+    
+    prob_ia = model.predict_proba(X.tail(1)) [0][1]
+    return prob_ia
+
+# --- 4. CORE EXECUTION ---
 try:
-    # Coleta de dados em tempo real (EUR/USD)
-    data = yf.download("EURUSD=X", period="2d", interval="1m", progress=False)
-    
+    data = fetch_and_refine_data("EURUSD=X")
     if not data.empty:
-        core = auraxis_engine(data)
+        # Telemetria Base
+        p_atual = data['Close'].iloc[-1]
+        atr = (data['High'] - data['Low']).rolling(14).mean().iloc[-1]
+        v_rel = data['Volume'].iloc[-1] / (data['Volume'].rolling(20).mean().iloc[-1] + 1e-9)
         
-        # --- EXIBIÇÃO DO PREÇO ---
-        st.markdown(f"<div class='price-hero'>{core['p']:.5f}</div>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#8b949e; letter-spacing: 2px;'>AURAXIS SOVEREIGN CORE vFINAL</p>", unsafe_allow_html=True)
+        # Inteligência Avançada
+        confianca_ia = run_ia_model(data)
+        
+        # Monte Carlo para TP3
+        paths = run_monte_carlo(p_atual, data['Returns'].std())
+        mc_target = np.percentile(paths[:, -1], 75) # Convergência estatística
+        
+        # Bayes Update
+        prob_final = bayesian_update(confianca_ia, v_rel)
 
-        # --- TELEMETRIA DE CAMPO ---
+        # Lógica de Gatilhos e Sucessão
+        u1_gate = (confianca_ia > 0.65) and (v_rel < 1.5)
+        u2_gate = (v_rel >= 1.5) or (confianca_ia > 0.60 and p_atual > data['Open'].iloc[-1] + (atr*0.3))
+        
+        # Modo Surfe
+        is_surfing = u1_gate and u2_gate
+
+        # --- INTERFACE VISUAL ---
+        st.markdown(f"<div class='price-hero'>{p_atual:.5f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:#8b949e;'>AURAXIS OS SINGULARITY | IA: {prob_final*100:.1f}%</p>", unsafe_allow_html=True)
+
+        # Telemetria Superior
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(f"<div class='metric-card'><small>COMPRESSÃO</small><br><span style='font-size:1.5rem; color:#3b82f6;'>{core['c']:.1f}%</span></div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='metric-card'><small>VOLUM. RELATIVO</small><br><span style='font-size:1.5rem;'>{core['v']:.2f}x</span></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='metric-card'><small>ESTIRAMENTO (Z)</small><br><span style='font-size:1.5rem; color:#ef4444;'>{abs(core['z']):.2f}</span></div>", unsafe_allow_html=True)
-        c4.markdown(f"<div class='metric-card'><small>IA CONFIDENCE</small><br><span style='font-size:1.5rem; color:#10b981;'>{core['ia']:.1f}%</span></div>", unsafe_allow_html=True)
+        c1.markdown(f"<div class='metric-card'><small>ESTAT. BAYES</small><br><span style='font-size:1.5rem; color:#10b981;'>{prob_final*100:.0f}%</span></div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='metric-card'><small>MONTE CARLO (TP3)</small><br><span style='font-size:1.5rem; color:#3b82f6;'>{mc_target:.5f}</span></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='metric-card'><small>VOL. RELATIVO</small><br><span style='font-size:1.5rem;'>{v_rel:.2f}x</span></div>", unsafe_allow_html=True)
+        c4.markdown(f"<div class='metric-card'><small>Z-SCORE</small><br><span style='font-size:1.5rem; color:#ef4444;'>{((p_atual - data['Close'].rolling(50).mean().iloc[-1])/data['Close'].rolling(50).std().iloc[-1]):.2f}</span></div>", unsafe_allow_html=True)
 
-        st.markdown("---")
+        if is_surfing:
+            st.markdown("<div class='surf-mode'>🌊 MODO SURFE ATIVO: U1 potencializada por Monte Carlo + Fluxo U2</div>", unsafe_allow_html=True)
 
-        # --- MODO SURFE (STACKING) ---
-        if core['surf']:
-            st.markdown(f"<div class='surf-mode'>🌊 MODO SURFE ATIVO: U1 surfando na energia de U2. Alvo: TP3 Geracional.</div>", unsafe_allow_html=True)
-
-        # --- AS DUAS REALIDADES INDEPENDENTES ---
         col_u1, col_u2 = st.columns(2)
 
+        # COLUNA U1 (SNIPER)
         with col_u1:
-            if core['u1_active'] or core['surf']:
-                status_u1 = "SURFANDO" if core['surf'] else "LANÇADA (SNIPER)"
+            if u1_gate or is_surfing:
                 st.markdown(f"""<div class='universe-box u1-active'>
-                    <h2 style='color:#10b981; margin:0;'>U1: SNIPER</h2>
-                    <p class='label-desc'>STATUS: <b>{status_u1}</b></p>
+                    <h3 style='color:#10b981;'>U1: SNIPER</h3>
+                    <p style='font-size:0.8rem; color:#8b949e;'>ESTADO: {"SURFANDO" if is_surfing else "LANÇADA"}</p>
                     <hr style='border-color:#30363d;'>
-                    <p class='label-desc'>Objetivo TP3 Macro</p>
-                    <p style='font-size:1.8rem; font-weight:bold; color:#10b981;'>{core['p'] + (core['atr']*5.8):.5f}</p>
-                    <p class='label-desc'>Safety Zone (Trava)</p>
-                    <p style='font-size:1.2rem; color:#ffffff;'>{core['p'] + (core['atr']*1.0):.5f}</p>
-                    <p class='label-desc'>Stop Loss Rígido</p>
-                    <p style='color:#ef4444;'>{core['p'] - (core['atr']*2.2):.5f}</p>
+                    <small>TP3 ESTATÍSTICO (MC)</small>
+                    <div style='font-size:1.8rem; font-weight:bold; color:#10b981;'>{max(mc_target, p_atual + (atr*5.5)):.5f}</div>
+                    <small>SAFETY ZONE</small><div style='color:#ffffff;'>{p_atual + (atr*1.2):.5f}</div>
+                    <small>STOP RÍGIDO</small><div style='color:#ef4444;'>{p_atual - (atr*2.5):.5f}</div>
                 </div>""", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='waiting-box'><h3>AGUARDANDO U1</h3><p>Sniper em observação.</p></div>", unsafe_allow_html=True)
+                st.markdown("<div class='waiting'><h3>AGUARDANDO U1</h3><p>Sniper fora de posição</p></div>", unsafe_allow_html=True)
 
+        # COLUNA U2 (FLOW)
         with col_u2:
-            if core['u2_active']:
+            if u2_gate:
                 st.markdown(f"""<div class='universe-box u2-active'>
-                    <h2 style='color:#3b82f6; margin:0;'>U2: FLOW</h2>
-                    <p class='label-desc'>STATUS: <b>FLUXO ATIVO</b></p>
+                    <h3 style='color:#1f6feb;'>U2: FLOW</h3>
+                    <p style='font-size:0.8rem; color:#8b949e;'>ESTADO: FLUXO INSTITUCIONAL</p>
                     <hr style='border-color:#30363d;'>
-                    <p class='label-desc'>Objetivo TP3 Impulso</p>
-                    <p style='font-size:1.8rem; font-weight:bold; color:#3b82f6;'>{core['p'] + (core['atr']*3.8):.5f}</p>
-                    <p class='label-desc'>Safety Zone (BE)</p>
-                    <p style='font-size:1.2rem; color:#ffffff;'>{core['p'] + (core['atr']*0.5):.5f}</p>
-                    <p class='label-desc'>Stop Loss Técnico</p>
-                    <p style='color:#ef4444;'>{core['p'] - (core['atr']*1.1):.5f}</p>
+                    <small>TP3 IMPULSO</small>
+                    <div style='font-size:1.8rem; font-weight:bold; color:#1f6feb;'>{p_atual + (atr*3.5):.5f}</div>
+                    <small>SAFETY ZONE</small><div style='color:#ffffff;'>{p_atual + (atr*0.6):.5f}</div>
+                    <small>STOP TÉCNICO</small><div style='color:#ef4444;'>{p_atual - (atr*1.2):.5f}</div>
                 </div>""", unsafe_allow_html=True)
             else:
-                st.markdown("<div class='waiting-box'><h3>AGUARDANDO U2</h3><p>Aguardando transição de volume.</p></div>", unsafe_allow_html=True)
+                st.markdown("<div class='waiting'><h3>AGUARDANDO U2</h3><p>Aguardando transição de volume</p></div>", unsafe_allow_html=True)
 
+        
+
+        # FOOTER E SNAPSHOT
         st.markdown("---")
-        
-        # --- FOOTER E SNAPSHOT ---
-        c_info, c_snap = st.columns([2, 1])
-        with c_info:
-            st.subheader("🗺️ Cartografia Dinâmica")
-            st.caption("O sistema opera via zonas de liquidez baseadas em desvios de ATR e volume institucional.")
-            
-        
-        with c_snap:
-            st.subheader("🏁 Turno")
-            if st.button("GERAR SNAPSHOT FINAL"):
-                pips_surf = (core['atr'] * 5.8) * 10000
-                st.success(f"Eficiência de Surfe: {pips_surf:.1f} pips potenciais.")
-                st.write(f"Relatório gerado em: {datetime.now().strftime('%H:%M:%S')}")
+        if st.button("🏁 GERAR SNAPSHOT DE EFICIÊNCIA"):
+            eficiencia = (mc_target - p_atual) * 10000
+            st.success(f"Snapshot Final: Eficiência Probabilística de {eficiencia:.1f} pips.")
 
 except Exception as e:
-    st.info("Sincronizando consciência soberana... Verifique a conexão com o provedor de dados.")
+    st.info("Sincronizando campos neurais... Aguarde o próximo tick.")
 
-# Auto-refresh de 60 segundos para manter o terminal vivo
 st.markdown("""<meta http-equiv="refresh" content="60">""", unsafe_allow_html=True)
